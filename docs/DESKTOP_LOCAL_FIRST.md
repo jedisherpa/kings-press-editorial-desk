@@ -180,10 +180,13 @@ npm run desktop:verify-signed-release
 `MACOS_SIGNING_IDENTITY`, or an importable `APPLE_CERTIFICATE` plus
 `APPLE_CERTIFICATE_PASSWORD`. It also requires notarization credentials through
 either `APPLE_API_KEY` / `APPLE_API_ISSUER` / `APPLE_API_KEY_PATH` or
-`APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID`. Before Tauri notarizes the app,
-the signed build signs packaged native Node resources such as `.node` addons,
-`.dylib` libraries, and the bundled Node runtime; Node is signed with the V8/JIT
-entitlements in `src-tauri/macos-node-entitlements.plist`. The signed build also
-submits and staples the DMG. The signed verifier additionally requires a
-non-ad-hoc Developer ID signature, a stapled app notarization ticket, and a
-passing Gatekeeper install assessment for the DMG.
+`APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID`. Local release work can instead
+use a saved `notarytool` keychain profile via
+`APPLE_NOTARY_KEYCHAIN_PROFILE` or `KINGS_PRESS_NOTARY_KEYCHAIN_PROFILE`. Before
+Tauri notarizes the app, the signed build signs packaged native Node resources
+such as `.node` addons, `.dylib` libraries, and the bundled Node runtime; Node is
+signed with the V8/JIT entitlements in
+`src-tauri/macos-node-entitlements.plist`. The signed build also submits and
+staples the DMG. The signed verifier additionally requires a non-ad-hoc
+Developer ID signature, a stapled app notarization ticket, and a passing
+Gatekeeper install assessment for the DMG.

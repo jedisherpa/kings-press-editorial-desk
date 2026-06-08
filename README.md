@@ -69,6 +69,9 @@ npm run desktop:verify-signed-release
 
 Signing requires Apple Developer credentials in environment variables. See
 [docs/DESKTOP_LOCAL_FIRST.md](docs/DESKTOP_LOCAL_FIRST.md) for details.
+For local release work, the safest path is a saved `notarytool` keychain
+profile exposed as `APPLE_NOTARY_KEYCHAIN_PROFILE`, so app-specific passwords do
+not need to be stored in shell history or committed scripts.
 
 ## Documentation
 
