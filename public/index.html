@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>King's Press — Editorial Desk</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Local browser runtime: packaged for offline desktop startup. -->
+  <script src="vendor/react.production.min.js"></script>
+  <script src="vendor/react-dom.production.min.js"></script>
+  <script src="vendor/babel.min.js"></script>
+
+  <!-- Logic (plain JS) -->
+  <script src="store.js"></script>
+  <script src="desktop.js"></script>
+  <script src="ai.js"></script>
+  <script src="gates.js"></script>
+  <script src="generators.js"></script>
+  <script src="weave.js"></script>
+  <script src="exporters.js"></script>
+  <script src="drive.js"></script>
+  <script src="studio.js"></script>
+  <script src="gather.js"></script>
+
+  <!-- Components (Babel JSX) -->
+  <script type="text/babel" src="components-common.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="screen-library.jsx"></script>
+  <script type="text/babel" src="screen-workspace.jsx"></script>
+  <script type="text/babel" src="screen-review.jsx"></script>
+  <script type="text/babel" src="screen-revision.jsx"></script>
+  <script type="text/babel" src="screen-outputs.jsx"></script>
+  <script type="text/babel" src="screen-weave.jsx"></script>
+  <script type="text/babel" src="media-components.jsx"></script>
+  <script type="text/babel" src="screen-studio.jsx"></script>
+  <script type="text/babel" src="screen-gather.jsx"></script>
+  <script type="text/babel" src="screen-references.jsx"></script>
+  <script type="text/babel" src="screen-book.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
