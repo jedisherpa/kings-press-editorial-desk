@@ -1,5 +1,6 @@
 import { chmod, cp, mkdir, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { spawn } from "node:child_process";
 
 const root = process.cwd();
 const standaloneDir = join(root, ".next", "standalone");
@@ -24,6 +25,73 @@ async function copyRequiredDir(from: string, to: string, label: string) {
   await cp(from, to, { recursive: true });
 }
 
+async function run(command: string, args: string[]) {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, { stdio: "inherit" });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${command} ${args.join(" ")} failed with exit ${code}`));
+    });
+  });
+}
+
+async function runCapture(command: string, args: string[]) {
+  return await new Promise<string>((resolve, reject) => {
+    const child = spawn(command, args, { stdio: "pipe" });
+    let out = "";
+    child.stdout.on("data", (data) => { out += data; });
+    child.stderr.on("data", (data) => { out += data; });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) resolve(out);
+      else reject(new Error(`${command} ${args.join(" ")} failed with exit ${code}\n${out}`));
+    });
+  });
+}
+
+async function linkedLibraries(path: string) {
+  if (process.platform !== "darwin") return [];
+  const output = await runCapture("otool", ["-L", path]);
+  return output
+    .split("\n")
+    .slice(1)
+    .map((line) => line.trim().match(/^(.+?)\s+\(compatibility version/)?.[1])
+    .filter((value): value is string => Boolean(value));
+}
+
+function shouldBundleDylib(path: string) {
+  return (
+    process.platform === "darwin" &&
+    path.startsWith("/") &&
+    !path.startsWith("/usr/lib/") &&
+    !path.startsWith("/System/")
+  );
+}
+
+function resolveBundledDylib(linkedPath: string, fromFile: string) {
+  if (shouldBundleDylib(linkedPath)) {
+    return { installName: linkedPath, sourcePath: linkedPath, targetName: basename(linkedPath) };
+  }
+  if (process.platform === "darwin" && linkedPath.startsWith("@loader_path/")) {
+    const targetName = basename(linkedPath);
+    return {
+      installName: linkedPath,
+      sourcePath: join(dirname(fromFile), linkedPath.slice("@loader_path/".length)),
+      targetName,
+    };
+  }
+  if (process.platform === "darwin" && linkedPath.startsWith("@rpath/")) {
+    const targetName = basename(linkedPath);
+    return {
+      installName: linkedPath,
+      sourcePath: join(dirname(fromFile), targetName),
+      targetName,
+    };
+  }
+  return null;
+}
+
 async function copyNodeRuntime() {
   const nodePath = await realpath(process.execPath);
   if (!(await exists(nodePath))) {
@@ -31,11 +99,57 @@ async function copyNodeRuntime() {
   }
   const binName = process.platform === "win32" ? "node.exe" : "node";
   const binDir = join(nodeResourceDir, "bin");
+  const libDir = join(nodeResourceDir, "lib");
   const target = join(binDir, binName);
   await rm(nodeResourceDir, { recursive: true, force: true });
   await mkdir(binDir, { recursive: true });
+  await mkdir(libDir, { recursive: true });
   await cp(nodePath, target, { dereference: true });
   if (process.platform !== "win32") await chmod(target, 0o755);
+
+  const bundledDylibs = new Map<string, string>();
+  if (process.platform === "darwin") {
+    const queue = [nodePath];
+    const seen = new Set<string>();
+    for (let i = 0; i < queue.length; i += 1) {
+      const current = queue[i];
+      if (seen.has(current)) continue;
+      seen.add(current);
+      for (const lib of await linkedLibraries(current)) {
+        const resolved = resolveBundledDylib(lib, current);
+        if (!resolved) continue;
+        const libSource = await realpath(resolved.sourcePath);
+        const libTarget = join(libDir, resolved.targetName);
+        if (!bundledDylibs.has(lib)) {
+          await cp(libSource, libTarget, { dereference: true });
+          await chmod(libTarget, 0o755);
+          bundledDylibs.set(lib, libTarget);
+          queue.push(libSource);
+        }
+      }
+    }
+
+    for (const [originalPath, copiedPath] of bundledDylibs) {
+      const nodeRelativePath = `@executable_path/../lib/${basename(copiedPath)}`;
+      await run("install_name_tool", ["-change", originalPath, nodeRelativePath, target]);
+    }
+
+    for (const [originalPath, copiedPath] of bundledDylibs) {
+      await run("install_name_tool", ["-id", `@loader_path/${basename(copiedPath)}`, copiedPath]);
+      for (const linked of await linkedLibraries(copiedPath)) {
+        const copiedDependency = bundledDylibs.get(linked);
+        if (copiedDependency) {
+          await run("install_name_tool", [
+            "-change",
+            linked,
+            `@loader_path/${basename(copiedDependency)}`,
+            copiedPath,
+          ]);
+        }
+      }
+    }
+  }
+
   await writeFile(
     join(nodeResourceDir, "runtime.json"),
     JSON.stringify({
@@ -45,6 +159,7 @@ async function copyNodeRuntime() {
       arch: process.arch,
       version: process.version,
       bin: `bin/${binName}`,
+      dylibs: [...bundledDylibs.values()].map((path) => `lib/${basename(path)}`),
     }, null, 2),
   );
 }
